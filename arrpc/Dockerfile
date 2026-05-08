@@ -19,7 +19,7 @@ ENV NODE_ENV=production \
     NODE_NO_WARNINGS=1 \
     XDG_RUNTIME_DIR=/run/discord-ipc
 
-EXPOSE 1337
+EXPOSE 6463
 
 ENTRYPOINT ["/sbin/tini", "--", "/app/entrypoint.sh"]
 CMD ["node", "server.js"]

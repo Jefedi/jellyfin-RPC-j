@@ -21,8 +21,9 @@
 #   2. Sur ton PC, ouvre http://127.0.0.1:<FIREFOX_PORT>
 #   3. Dans le Firefox du conteneur :
 #      - installe l'extension arRPC (https://github.com/OpenAsar/arrpc)
-#      - dans les options de l'extension, mets ws://arrpc:1337
-#        (DNS interne docker - ne pas mettre localhost)
+#      - dans les options de l'extension, mets ws://arrpc:6463
+#        (DNS interne docker - ne pas mettre localhost. 6463 = port WebSocket
+#        standard de Discord, c'est ce que arRPC utilise par defaut)
 #      - ouvre https://discord.com/app et logue toi
 #      - laisse l'onglet ouvert (Firefox tourne 24/7 dans le conteneur)
 #   4. C'est plie : jellyfin-rpc -> arrpc -> extension -> Discord Web
@@ -51,12 +52,12 @@ services:
       XDG_RUNTIME_DIR: /run/discord-ipc
     volumes:
       - discord-ipc:/run/discord-ipc
-    # Port 1337 NON expose sur l'hote : firefox l'atteint via le reseau docker.
-    # Si tu veux debugger depuis l'hote, decommente :
+    # Port 6463 (WebSocket arRPC) NON expose sur l'hote : firefox l'atteint
+    # via le reseau docker interne. Pour debugger depuis l'hote, decommente :
     # ports:
-    #   - "127.0.0.1:1337:1337"
+    #   - "127.0.0.1:6463:6463"
     expose:
-      - "1337"
+      - "6463"
 
   firefox:
     image: lscr.io/linuxserver/firefox:latest

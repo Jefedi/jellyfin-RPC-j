@@ -22,4 +22,4 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 console.log('[arrpc] bridge ready');
 console.log(`[arrpc] IPC socket dir: ${process.env.XDG_RUNTIME_DIR ?? '/tmp'}`);
-console.log('[arrpc] WebSocket on port 1337 for the browser extension');
+console.log('[arrpc] WebSocket on port 6463 for the browser extension');

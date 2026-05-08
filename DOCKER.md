@@ -186,7 +186,7 @@ sans GUI), tu peux quand meme tout faire tenir dans Docker. La stack
 ┌──────────────────────────────────────────────────────────┐
 │                   Ton serveur Debian                      │
 │                                                            │
-│  ┌──────────┐   socket   ┌────────┐   ws:1337   ┌────────┐│
+│  ┌──────────┐   socket   ┌────────┐   ws:6463   ┌────────┐│
 │  │ jellyfin │ ──IPC───►  │ arRPC  │ ──────────► │firefox ││
 │  │   -rpc   │            │ daemon │             │ + ext  ││
 │  └────┬─────┘            └────────┘             └───┬────┘│
@@ -200,7 +200,8 @@ sans GUI), tu peux quand meme tout faire tenir dans Docker. La stack
 ```
 
 - **`arrpc`** mime Discord : il pose un socket `/run/discord-ipc/discord-ipc-0`
-  (que `jellyfin-rpc` consomme) et expose un WebSocket sur `:1337`.
+  (que `jellyfin-rpc` consomme) et expose un WebSocket sur `:6463` (port
+  standard Discord).
 - **`firefox`** (image `lscr.io/linuxserver/firefox`) execute Firefox dans le
   conteneur avec une UI web noVNC sur `:3000`. Tu y ouvres Discord Web,
   installes l'extension arRPC une fois, et laisses tourner.
@@ -257,10 +258,11 @@ Dans ce Firefox :
 
 1. Ouvre https://github.com/OpenAsar/arrpc/releases et telecharge le **xpi** de
    l'extension Firefox arRPC. Glisse le sur la fenetre Firefox pour l'installer.
-2. Dans les options de l'extension, mets **`ws://arrpc:1337`** comme cible
-   (DNS interne docker : `arrpc` resoud vers le conteneur arRPC). **Ne mets pas
-   `localhost`** : Firefox a sa propre pile reseau, localhost dans Firefox
-   pointe sur lui-meme, pas sur arRPC.
+2. Dans les options de l'extension, mets **`ws://arrpc:6463`** comme cible
+   (DNS interne docker : `arrpc` resoud vers le conteneur arRPC ; 6463 est le
+   port WebSocket standard de Discord). **Ne mets pas `localhost`** : Firefox a
+   sa propre pile reseau, localhost dans Firefox pointe sur lui-meme, pas sur
+   arRPC.
 3. Ouvre https://discord.com/app et logue toi.
 4. Laisse cet onglet ouvert. Il restera ouvert tant que le conteneur Firefox
    tourne (volume `firefox-config` persistant).
@@ -280,7 +282,7 @@ entre les rebuilds.
 
 ### Securite
 
-- Le port `1337` (WebSocket arRPC) **n'est pas expose sur l'hote** : Firefox
+- Le port `6463` (WebSocket arRPC) **n'est pas expose sur l'hote** : Firefox
   l'atteint uniquement via le reseau docker interne (DNS service `arrpc`).
 - Le port Firefox est bind sur `127.0.0.1` par defaut.
 - Auth Kasm obligatoire pour acceder a Firefox.
@@ -297,7 +299,8 @@ entre les rebuilds.
   `docker inspect jellyfin-rpc | grep discord-ipc`.
 
 **L'extension arRPC ne pousse rien dans Discord Web**
-- Verifie qu'elle pointe sur `ws://localhost:1337` (et pas `wss://...`).
+- Verifie qu'elle pointe sur `ws://arrpc:6463` (et pas `wss://...` ni
+  `localhost`).
 - Recharge l'onglet `discord.com/app` apres install / config.
 - Dans la console DevTools de Firefox, l'extension log les events recus.
 
