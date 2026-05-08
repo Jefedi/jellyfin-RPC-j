@@ -12,15 +12,17 @@
 #
 # Securite par defaut :
 #   - port Firefox bind UNIQUEMENT sur 127.0.0.1 -> accede via SSH tunnel
-#   - WebSocket arrpc bind UNIQUEMENT sur 127.0.0.1
 #   - login Kasm obligatoire pour acceder a Firefox
+#   - WebSocket arrpc N'est PAS expose sur l'hote : firefox y accede via le
+#     reseau interne docker (DNS service "arrpc")
 #
 # Setup humain UNE FOIS :
-#   1. SSH tunnel : ssh -L 3000:127.0.0.1:3000 user@server
-#   2. Sur ton PC, ouvre http://127.0.0.1:3000
+#   1. SSH tunnel : ssh -L <FIREFOX_PORT>:127.0.0.1:<FIREFOX_PORT> user@server
+#   2. Sur ton PC, ouvre http://127.0.0.1:<FIREFOX_PORT>
 #   3. Dans le Firefox du conteneur :
 #      - installe l'extension arRPC (https://github.com/OpenAsar/arrpc)
-#      - dans les options de l'extension, mets ws://localhost:1337
+#      - dans les options de l'extension, mets ws://arrpc:1337
+#        (DNS interne docker - ne pas mettre localhost)
 #      - ouvre https://discord.com/app et logue toi
 #      - laisse l'onglet ouvert (Firefox tourne 24/7 dans le conteneur)
 #   4. C'est plie : jellyfin-rpc -> arrpc -> extension -> Discord Web
@@ -31,6 +33,10 @@ volumes:
   discord-ipc:
   firefox-config:
 
+networks:
+  rpc-net:
+    driver: bridge
+
 services:
   arrpc:
     build:
@@ -39,22 +45,25 @@ services:
     image: arrpc:local
     container_name: arrpc
     restart: unless-stopped
+    networks:
+      - rpc-net
     environment:
       XDG_RUNTIME_DIR: /run/discord-ipc
     volumes:
       - discord-ipc:/run/discord-ipc
-    ports:
-      # WebSocket pour l'extension navigateur (consomme par firefox via netns partage).
-      - "127.0.0.1:1337:1337"
-      # UI web Firefox : firefox utilise network_mode service:arrpc, donc le port
-      # est expose ici (pas dans le service firefox).
-      - "${FIREFOX_BIND:-127.0.0.1}:${FIREFOX_PORT:-3000}:3000"
+    # Port 1337 NON expose sur l'hote : firefox l'atteint via le reseau docker.
+    # Si tu veux debugger depuis l'hote, decommente :
+    # ports:
+    #   - "127.0.0.1:1337:1337"
+    expose:
+      - "1337"
 
   firefox:
     image: lscr.io/linuxserver/firefox:latest
     container_name: firefox-discord
     restart: unless-stopped
-    network_mode: "service:arrpc"
+    networks:
+      - rpc-net
     depends_on:
       - arrpc
     shm_size: "1gb"
@@ -68,6 +77,8 @@ services:
       KASM_PASS: "${KASM_PASS:?KASM_PASS manquant : defini-le dans .env}"
     volumes:
       - firefox-config:/config
+    ports:
+      - "${FIREFOX_BIND:-127.0.0.1}:${FIREFOX_PORT:-3000}:3000"
 
   jellyfin-rpc:
     build:
@@ -76,6 +87,8 @@ services:
     image: jellyfin-rpc:local
     container_name: jellyfin-rpc
     restart: unless-stopped
+    networks:
+      - rpc-net
     user: "1000:1000"
     depends_on:
       - arrpc

@@ -257,8 +257,10 @@ Dans ce Firefox :
 
 1. Ouvre https://github.com/OpenAsar/arrpc/releases et telecharge le **xpi** de
    l'extension Firefox arRPC. Glisse le sur la fenetre Firefox pour l'installer.
-2. Dans les options de l'extension, mets `ws://localhost:1337` comme cible
-   (Firefox partage la pile reseau avec arrpc, donc localhost = arrpc).
+2. Dans les options de l'extension, mets **`ws://arrpc:1337`** comme cible
+   (DNS interne docker : `arrpc` resoud vers le conteneur arRPC). **Ne mets pas
+   `localhost`** : Firefox a sa propre pile reseau, localhost dans Firefox
+   pointe sur lui-meme, pas sur arRPC.
 3. Ouvre https://discord.com/app et logue toi.
 4. Laisse cet onglet ouvert. Il restera ouvert tant que le conteneur Firefox
    tourne (volume `firefox-config` persistant).
@@ -278,8 +280,9 @@ entre les rebuilds.
 
 ### Securite
 
-- Le port `1337` (WebSocket arRPC) est bind sur `127.0.0.1` uniquement.
-- Le port `3000` (UI Firefox) est bind sur `127.0.0.1` par defaut.
+- Le port `1337` (WebSocket arRPC) **n'est pas expose sur l'hote** : Firefox
+  l'atteint uniquement via le reseau docker interne (DNS service `arrpc`).
+- Le port Firefox est bind sur `127.0.0.1` par defaut.
 - Auth Kasm obligatoire pour acceder a Firefox.
 - **Si tu changes `FIREFOX_BIND=0.0.0.0` pour exposer Firefox sur le LAN** : un
   attaquant qui force Kasm a un acces direct a ton compte Discord. Mets un mot
