@@ -1,0 +1,13 @@
+{
+  "name": "jellyfin-rpc-arrpc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "arRPC bridge for the headless jellyfin-rpc stack",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "arrpc": "^3.5.0"
+  }
+}

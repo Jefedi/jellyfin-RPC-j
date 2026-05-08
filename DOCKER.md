@@ -18,15 +18,15 @@ Concretement :
 | Ou tourne Discord ? | Ou tu dois lancer le conteneur ? |
 |---------------------|----------------------------------|
 | Sur ton PC (Linux/macOS/Windows + WSL2) | Sur ce **meme PC** |
-| Sur un serveur headless (sans Discord installe) | **Pas possible directement** : il n'y a pas de Discord local pour recevoir l'IPC |
+| Sur un serveur headless (sans Discord installe) | Stack `docker-compose.headless.yml` (Firefox + arRPC + jellyfin-rpc), cf section dediee plus bas |
 
 > **Mon serveur n'a pas Discord installe : je fais quoi ?**
-> Tu as deux options :
+> Deux options :
 > 1. Installer le conteneur sur ta machine de bureau (celle ou Discord tourne)
 >    et le laisser allume tant que tu veux la presence active. C'est la
 >    solution la plus simple.
-> 2. Utiliser un projet comme [arRPC](https://github.com/OpenAsar/arrpc) ou un
->    bridge IPC reseau. Sortie du scope de ce repo.
+> 2. Lancer la **stack headless** (Firefox + arRPC + jellyfin-rpc tout en
+>    docker) sur ton serveur. Voir [Mode headless](#mode-headless-serveur-sans-discord) plus bas.
 
 Le cote serveur Jellyfin (l'API qui dit ce que tu regardes) peut bien sur etre
 n'importe ou, c'est le `url` du fichier de config.
@@ -173,3 +173,131 @@ docker run -d --name jellyfin-rpc \
   -v "/run/user/$(id -u):/run/user/$(id -u)" \
   jellyfin-rpc:local
 ```
+
+---
+
+## Mode headless (serveur sans Discord)
+
+Si ton serveur n'a pas de client Discord installe (cas typique : Debian/Proxmox
+sans GUI), tu peux quand meme tout faire tenir dans Docker. La stack
+`docker-compose.headless.yml` orchestre 3 conteneurs :
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   Ton serveur Debian                      │
+│                                                            │
+│  ┌──────────┐   socket   ┌────────┐   ws:1337   ┌────────┐│
+│  │ jellyfin │ ──IPC───►  │ arRPC  │ ──────────► │firefox ││
+│  │   -rpc   │            │ daemon │             │ + ext  ││
+│  └────┬─────┘            └────────┘             └───┬────┘│
+│       │                                              │     │
+│       ▼                                              ▼     │
+│  Jellyfin API                              Discord Web    │
+└──────────────────────────────────────────────────────────┘
+                                                       │
+                                                       ▼
+                                     Discord (vu par tes amis)
+```
+
+- **`arrpc`** mime Discord : il pose un socket `/run/discord-ipc/discord-ipc-0`
+  (que `jellyfin-rpc` consomme) et expose un WebSocket sur `:1337`.
+- **`firefox`** (image `lscr.io/linuxserver/firefox`) execute Firefox dans le
+  conteneur avec une UI web noVNC sur `:3000`. Tu y ouvres Discord Web,
+  installes l'extension arRPC une fois, et laisses tourner.
+- **`jellyfin-rpc`** est strictement le meme binaire que dans le mode standard.
+
+### 1. Cloner et preparer la config
+
+```bash
+git clone -b ax https://github.com/Jefedi/jellyfin-rpc-j.git
+cd jellyfin-rpc-j
+cp config/main.json.example config/main.json
+$EDITOR config/main.json   # url, api_key, username
+```
+
+### 2. Variables d'environnement (.env)
+
+```bash
+cp .env.example .env
+$EDITOR .env
+```
+
+Edite au minimum `KASM_USER` et `KASM_PASS` (auth de l'UI Firefox). Choisis
+un mot de passe long : c'est l'acces a ton compte Discord.
+
+### 3. Build + run
+
+```bash
+docker compose -f docker-compose.headless.yml up -d --build
+```
+
+Verifie les 3 conteneurs :
+
+```bash
+docker compose -f docker-compose.headless.yml ps
+docker compose -f docker-compose.headless.yml logs -f jellyfin-rpc
+```
+
+`jellyfin-rpc` doit afficher `Connected!` apres quelques secondes (apres que
+arRPC ait pose son socket).
+
+### 4. Configuration humaine UNE SEULE FOIS
+
+Le port Firefox est bind par defaut sur `127.0.0.1:3000` (cf `.env`), donc tu
+y accedes via SSH tunnel depuis ton PC :
+
+```bash
+ssh -L 3000:127.0.0.1:3000 user@ton-serveur
+```
+
+Puis sur ton PC : `http://127.0.0.1:3000` -> connecte toi avec
+`KASM_USER`/`KASM_PASS` -> tu vois Firefox dans le navigateur.
+
+Dans ce Firefox :
+
+1. Ouvre https://github.com/OpenAsar/arrpc/releases et telecharge le **xpi** de
+   l'extension Firefox arRPC. Glisse le sur la fenetre Firefox pour l'installer.
+2. Dans les options de l'extension, mets `ws://localhost:1337` comme cible
+   (Firefox partage la pile reseau avec arrpc, donc localhost = arrpc).
+3. Ouvre https://discord.com/app et logue toi.
+4. Laisse cet onglet ouvert. Il restera ouvert tant que le conteneur Firefox
+   tourne (volume `firefox-config` persistant).
+
+Lance une lecture sur Jellyfin -> ta presence apparait sur Discord (vu par
+tes amis) en ~7 s.
+
+### 5. Mises a jour
+
+```bash
+git pull origin ax
+docker compose -f docker-compose.headless.yml up -d --build
+```
+
+Le volume `firefox-config` est persistant, ta session Discord ne se perd pas
+entre les rebuilds.
+
+### Securite
+
+- Le port `1337` (WebSocket arRPC) est bind sur `127.0.0.1` uniquement.
+- Le port `3000` (UI Firefox) est bind sur `127.0.0.1` par defaut.
+- Auth Kasm obligatoire pour acceder a Firefox.
+- **Si tu changes `FIREFOX_BIND=0.0.0.0` pour exposer Firefox sur le LAN** : un
+  attaquant qui force Kasm a un acces direct a ton compte Discord. Mets un mot
+  de passe **long et unique**, et idealement, garde 127.0.0.1 + SSH tunnel.
+
+### Depannage headless
+
+**`jellyfin-rpc` boucle sur `failed to connect to IPC socket`**
+- arRPC n'a pas (encore) pose son socket. `docker compose logs arrpc` doit
+  afficher `bridge ready`.
+- Verifie que le volume nomme `discord-ipc` est bien monte sur les deux :
+  `docker inspect jellyfin-rpc | grep discord-ipc`.
+
+**L'extension arRPC ne pousse rien dans Discord Web**
+- Verifie qu'elle pointe sur `ws://localhost:1337` (et pas `wss://...`).
+- Recharge l'onglet `discord.com/app` apres install / config.
+- Dans la console DevTools de Firefox, l'extension log les events recus.
+
+**Ne pas se faire ban Discord**
+- arRPC se contente d'utiliser les API publiques de l'extension navigateur. Il
+  n'y a pas de risque connu, mais c'est non-officiel.

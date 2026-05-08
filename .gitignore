@@ -6,6 +6,8 @@
 /config/*
 !/config/main.json.example
 /pkg
+/.env
+/firefox-config
 /.DS_Store
 /.vscode
 /jftest

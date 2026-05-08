@@ -1,0 +1,88 @@
+# Stack complete pour serveur SANS Discord installe.
+#
+# Compose autonome (PAS un override) - lance avec :
+#   docker compose -f docker-compose.headless.yml up -d --build
+#
+# Variables attendues dans un fichier .env (cf .env.example) :
+#   KASM_USER, KASM_PASS    -> auth de l'UI web Firefox
+#   TZ                      -> timezone (defaut Europe/Paris)
+#   LOG_LEVEL               -> log de jellyfin-rpc (defaut info)
+#   FIREFOX_BIND            -> ip de bind du port Firefox (defaut 127.0.0.1)
+#   FIREFOX_PORT            -> port hote du UI Firefox (defaut 3000)
+#
+# Securite par defaut :
+#   - port Firefox bind UNIQUEMENT sur 127.0.0.1 -> accede via SSH tunnel
+#   - WebSocket arrpc bind UNIQUEMENT sur 127.0.0.1
+#   - login Kasm obligatoire pour acceder a Firefox
+#
+# Setup humain UNE FOIS :
+#   1. SSH tunnel : ssh -L 3000:127.0.0.1:3000 user@server
+#   2. Sur ton PC, ouvre http://127.0.0.1:3000
+#   3. Dans le Firefox du conteneur :
+#      - installe l'extension arRPC (https://github.com/OpenAsar/arrpc)
+#      - dans les options de l'extension, mets ws://localhost:1337
+#      - ouvre https://discord.com/app et logue toi
+#      - laisse l'onglet ouvert (Firefox tourne 24/7 dans le conteneur)
+#   4. C'est plie : jellyfin-rpc -> arrpc -> extension -> Discord Web
+
+name: jellyfin-rpc-headless
+
+volumes:
+  discord-ipc:
+  firefox-config:
+
+services:
+  arrpc:
+    build:
+      context: ./arrpc
+      dockerfile: Dockerfile
+    image: arrpc:local
+    container_name: arrpc
+    restart: unless-stopped
+    environment:
+      XDG_RUNTIME_DIR: /run/discord-ipc
+    volumes:
+      - discord-ipc:/run/discord-ipc
+    ports:
+      # WebSocket pour l'extension navigateur (consomme par firefox via netns partage).
+      - "127.0.0.1:1337:1337"
+      # UI web Firefox : firefox utilise network_mode service:arrpc, donc le port
+      # est expose ici (pas dans le service firefox).
+      - "${FIREFOX_BIND:-127.0.0.1}:${FIREFOX_PORT:-3000}:3000"
+
+  firefox:
+    image: lscr.io/linuxserver/firefox:latest
+    container_name: firefox-discord
+    restart: unless-stopped
+    network_mode: "service:arrpc"
+    depends_on:
+      - arrpc
+    shm_size: "1gb"
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "${TZ:-Europe/Paris}"
+      KASM_USER: "${KASM_USER:?KASM_USER manquant : defini-le dans .env}"
+      KASM_PASS: "${KASM_PASS:?KASM_PASS manquant : defini-le dans .env}"
+    volumes:
+      - firefox-config:/config
+
+  jellyfin-rpc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jellyfin-rpc:local
+    container_name: jellyfin-rpc
+    restart: unless-stopped
+    user: "1000:1000"
+    depends_on:
+      - arrpc
+    environment:
+      RUST_LOG: "${LOG_LEVEL:-info}"
+      XDG_RUNTIME_DIR: /run/discord-ipc
+    volumes:
+      - ./config:/config
+      - discord-ipc:/run/discord-ipc
+    command: ["-c", "/config/main.json", "-i", "/config/urls.json", "-t", "7"]
