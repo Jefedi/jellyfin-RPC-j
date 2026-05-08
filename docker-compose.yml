@@ -1,0 +1,20 @@
+services:
+  jellyfin-rpc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jellyfin-rpc:local
+    container_name: jellyfin-rpc
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      RUST_LOG: ${LOG_LEVEL:-info}
+      XDG_RUNTIME_DIR: /run/user/1000
+    volumes:
+      # Fichier de configuration : copie example.json -> ./config/main.json puis edite-le.
+      - ./config:/config
+      # Socket IPC Discord : OBLIGATOIRE pour que la presence s'affiche.
+      # Discord doit etre lance sur la machine hote (meme si l'app tourne en docker).
+      # UID 1000 par defaut ; adapte XDG_RUNTIME_DIR si ton uid est different.
+      - /run/user/1000:/run/user/1000
+    command: ["-c", "/config/main.json", "-i", "/config/urls.json", "-t", "7"]
