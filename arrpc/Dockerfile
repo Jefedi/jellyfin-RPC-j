@@ -1,9 +1,7 @@
 # syntax=docker/dockerfile:1.6
 FROM node:20-alpine
 
-RUN apk add --no-cache tini \
-    && addgroup -S -g 1000 arrpc \
-    && adduser -S -G arrpc -u 1000 arrpc
+RUN apk add --no-cache tini
 
 WORKDIR /app
 
@@ -12,9 +10,9 @@ RUN npm install --omit=dev --no-audit --no-fund
 
 COPY server.js ./
 
-RUN chown -R arrpc:arrpc /app
+RUN chown -R node:node /app
 
-USER arrpc
+USER node
 
 ENV NODE_ENV=production \
     NODE_NO_WARNINGS=1 \
