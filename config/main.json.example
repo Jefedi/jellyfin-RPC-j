@@ -1,0 +1,17 @@
+{
+    "jellyfin": {
+        "url": "https://jellyfin.tondomaine.fr",
+        "api_key": "REMPLACE_PAR_TA_CLE_API",
+        "username": "ton_pseudo_jellyfin",
+        "self_signed_cert": false
+    },
+    "discord": {
+        "show_paused": true
+    },
+    "images": {
+        "enable_images": true,
+        "imgur_images": false,
+        "litterbox_images": false,
+        "process_images": false
+    }
+}

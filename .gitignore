@@ -3,6 +3,8 @@
 /jellyfin-rpc/Cargo.lock
 /jellyfin-rpc-cli/target
 /main.json
+/config/*
+!/config/main.json.example
 /pkg
 /.DS_Store
 /.vscode
