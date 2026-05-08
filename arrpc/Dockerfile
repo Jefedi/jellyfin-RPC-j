@@ -1,18 +1,19 @@
 # syntax=docker/dockerfile:1.6
 FROM node:20-alpine
 
-RUN apk add --no-cache tini
+RUN apk add --no-cache tini su-exec
 
 WORKDIR /app
 
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 
-COPY server.js ./
+COPY server.js entrypoint.sh ./
+RUN chmod +x /app/entrypoint.sh \
+    && chown -R node:node /app
 
-RUN chown -R node:node /app
-
-USER node
+# Le container demarre en root pour pouvoir chown le volume IPC, puis
+# entrypoint.sh drop a node:node avant d'executer server.js.
 
 ENV NODE_ENV=production \
     NODE_NO_WARNINGS=1 \
@@ -20,5 +21,5 @@ ENV NODE_ENV=production \
 
 EXPOSE 1337
 
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/sbin/tini", "--", "/app/entrypoint.sh"]
 CMD ["node", "server.js"]
