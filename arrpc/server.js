@@ -1,6 +1,7 @@
 import RPCServer from 'arrpc';
 
-const server = new RPCServer();
+// arRPC uses an async constructor: `new RPCServer()` returns a Promise.
+const server = await new RPCServer();
 
 server.on('activity', (data) => {
     const name = data?.activity?.name ?? data?.name ?? 'unknown';
