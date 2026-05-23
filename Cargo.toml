@@ -3,12 +3,14 @@ resolver = "2"
 members = [
     "jellyfin-rpc",
     "jellyfin-rpc-cli",
+    "jellyfin-rpc-gui",
     #"jftest", # Used for local testing
 ]
 
 default-members = [
     "jellyfin-rpc",
     "jellyfin-rpc-cli",
+    "jellyfin-rpc-gui",
 ]
 
 [profile.release]
